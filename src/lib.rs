@@ -1,16 +1,18 @@
-#![doc(html_root_url = "https://docs.rs/humantime-serde/1.0")]
+#![no_std]
+// #![doc(html_root_url = "https://docs.rs/humantime-serde/1.0")]
 #![forbid(unsafe_code)]
 
 //! Serde support for the `humantime` crate.
 //!
 //! Based on [this fork](https://github.com/tailhook/serde-humantime/tree/serde_wrapper).
 //!
-//! Currently `std::time::{Duration, SystemTime}` are supported.
+//! Currently `std::time::Duration` and `time::OffsetDateTime` are supported.
 //!
 //! # Example
 //! ```
 //! use serde::{Serialize, Deserialize};
-//! use std::time::{Duration, SystemTime};
+//! use std::time::Duration;
+//! use time::OffsetDateTime;
 //!
 //! #[derive(Serialize, Deserialize)]
 //! struct Foo {
@@ -18,7 +20,7 @@
 //!     timeout: Duration,
 //!     #[serde(default)]
 //!     #[serde(with = "humantime_serde")]
-//!     time: Option<SystemTime>,
+//!     time: Option<OffsetDateTime>,
 //! }
 //! ```
 //!
@@ -27,13 +29,15 @@
 //! ```
 //! use serde::{Serialize, Deserialize};
 //! use humantime_serde::Serde;
-//! use std::time::SystemTime;
+//! use time::OffsetDateTime;
 //!
 //! #[derive(Serialize, Deserialize)]
 //! struct Foo {
-//!     timeout: Vec<Serde<SystemTime>>,
+//!     timeout: Vec<Serde<OffsetDateTime>>,
 //! }
 //! ```
+
+extern crate alloc;
 
 /// Reexport module.
 pub mod re {
@@ -42,14 +46,16 @@ pub mod re {
 
 pub mod option;
 
-use std::fmt;
-use std::ops::{Deref, DerefMut};
-use std::time::{Duration, SystemTime};
+use alloc::string::ToString;
+use core::fmt;
+use core::ops::{Deref, DerefMut};
+use core::time::{Duration};
 
 use humantime;
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
+use time::OffsetDateTime;
 
-/// Deserializes a `Duration` or `SystemTime` via the humantime crate.
+/// Deserializes a `Duration` or `OffsetDateTime` via the humantime crate.
 ///
 /// This function can be used with `serde_derive`'s `with` and
 /// `deserialize_with` annotations.
@@ -61,7 +67,7 @@ where
     Serde::deserialize(d).map(Serde::into_inner)
 }
 
-/// Serializes a `Duration` or `SystemTime` via the humantime crate.
+/// Serializes a `Duration` or `OffsetDateTime` via the humantime crate.
 ///
 /// This function can be used with `serde_derive`'s `with` and
 /// `serialize_with` annotations.
@@ -74,7 +80,7 @@ where
 }
 
 /// A wrapper type which implements `Serialize` and `Deserialize` for
-/// types involving `SystemTime` and `Duration`.
+/// types involving `OffsetDateTime` and `Duration`.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Serde<T>(T);
 
@@ -142,21 +148,21 @@ impl<'de> Deserialize<'de> for Serde<Duration> {
     }
 }
 
-impl<'de> Deserialize<'de> for Serde<SystemTime> {
-    fn deserialize<D>(d: D) -> Result<Serde<SystemTime>, D::Error>
+impl<'de> Deserialize<'de> for Serde<OffsetDateTime> {
+    fn deserialize<D>(d: D) -> Result<Serde<OffsetDateTime>, D::Error>
     where
         D: Deserializer<'de>,
     {
         struct V;
 
         impl<'de2> de::Visitor<'de2> for V {
-            type Value = SystemTime;
+            type Value = OffsetDateTime;
 
             fn expecting(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
                 fmt.write_str("a timestamp")
             }
 
-            fn visit_str<E>(self, v: &str) -> Result<SystemTime, E>
+            fn visit_str<E>(self, v: &str) -> Result<OffsetDateTime, E>
             where
                 E: de::Error,
             {
@@ -182,12 +188,12 @@ impl<'de> Deserialize<'de> for Serde<Option<Duration>> {
     }
 }
 
-impl<'de> Deserialize<'de> for Serde<Option<SystemTime>> {
-    fn deserialize<D>(d: D) -> Result<Serde<Option<SystemTime>>, D::Error>
+impl<'de> Deserialize<'de> for Serde<Option<OffsetDateTime>> {
+    fn deserialize<D>(d: D) -> Result<Serde<Option<OffsetDateTime>>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        match Option::<Serde<SystemTime>>::deserialize(d)? {
+        match Option::<Serde<OffsetDateTime>>::deserialize(d)? {
             Some(Serde(dur)) => Ok(Serde(Some(dur))),
             None => Ok(Serde(None)),
         }
@@ -216,7 +222,7 @@ impl ser::Serialize for Serde<Duration> {
     }
 }
 
-impl<'a> ser::Serialize for Serde<&'a SystemTime> {
+impl<'a> ser::Serialize for Serde<&'a OffsetDateTime> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -227,7 +233,7 @@ impl<'a> ser::Serialize for Serde<&'a SystemTime> {
     }
 }
 
-impl ser::Serialize for Serde<SystemTime> {
+impl ser::Serialize for Serde<OffsetDateTime> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -259,7 +265,7 @@ impl ser::Serialize for Serde<Option<Duration>> {
     }
 }
 
-impl<'a> ser::Serialize for Serde<&'a Option<SystemTime>> {
+impl<'a> ser::Serialize for Serde<&'a Option<OffsetDateTime>> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -271,7 +277,7 @@ impl<'a> ser::Serialize for Serde<&'a Option<SystemTime>> {
     }
 }
 
-impl ser::Serialize for Serde<Option<SystemTime>> {
+impl ser::Serialize for Serde<Option<OffsetDateTime>> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -283,7 +289,6 @@ impl ser::Serialize for Serde<Option<SystemTime>> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn with() {
@@ -330,12 +335,12 @@ mod test {
         #[derive(Serialize, Deserialize)]
         struct Foo {
             #[serde(with = "super")]
-            time: SystemTime,
+            time: OffsetDateTime,
         }
 
         let json = r#"{"time": "2018-05-11 18:28:30"}"#;
         let foo = serde_json::from_str::<Foo>(json).unwrap();
-        assert_eq!(foo.time, UNIX_EPOCH + Duration::new(1526063310, 0));
+        assert_eq!(foo.time, OffsetDateTime::UNIX_EPOCH + Duration::new(1526063310, 0));
         let reverse = serde_json::to_string(&foo).unwrap();
         assert_eq!(reverse, r#"{"time":"2018-05-11T18:28:30Z"}"#);
     }
@@ -345,12 +350,12 @@ mod test {
         #[derive(Serialize, Deserialize)]
         struct Foo {
             #[serde(with = "super", default)]
-            time: Option<SystemTime>,
+            time: Option<OffsetDateTime>,
         }
 
         let json = r#"{"time": "2018-05-11 18:28:30"}"#;
         let foo = serde_json::from_str::<Foo>(json).unwrap();
-        assert_eq!(foo.time, Some(UNIX_EPOCH + Duration::new(1526063310, 0)));
+        assert_eq!(foo.time, Some(OffsetDateTime::UNIX_EPOCH + Duration::new(1526063310, 0)));
         let reverse = serde_json::to_string(&foo).unwrap();
         assert_eq!(reverse, r#"{"time":"2018-05-11T18:28:30Z"}"#);
 
