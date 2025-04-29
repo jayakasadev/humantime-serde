@@ -52,7 +52,7 @@ use core::ops::{Deref, DerefMut};
 use core::time::{Duration};
 
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, FixedOffset, SecondsFormat, Utc};
 
 /// Deserializes a `Duration` or `DateTime<Tz>` via the humantime crate.
 ///
@@ -126,7 +126,7 @@ impl<'de> Deserialize<'de> for Serde<Duration> {
     {
         struct V;
 
-        impl<'de2> de::Visitor<'de2> for V {
+        impl de::Visitor<'_> for V {
             type Value = Duration;
 
             fn expecting(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
@@ -154,7 +154,7 @@ impl<'de> Deserialize<'de> for Serde<DateTime<Utc>> {
     {
         struct V;
 
-        impl<'de2> de::Visitor<'de2> for V {
+        impl de::Visitor<'_> for V {
             type Value = DateTime<Utc>;
 
             fn expecting(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
@@ -165,9 +165,39 @@ impl<'de> Deserialize<'de> for Serde<DateTime<Utc>> {
             where
                 E: de::Error,
             {
-                humantime::parse_rfc3339_weak(v).map_err(|_| {
-                    E::invalid_value(de::Unexpected::Str(v), &self)
-                })
+                Ok(
+                    DateTime::parse_from_rfc3339(v).map_err(
+                        |_| E::invalid_value(de::Unexpected::Str(v), &self)
+                    )?.to_utc()
+                )
+            }
+        }
+
+        d.deserialize_str(V).map(Serde)
+    }
+}
+
+impl<'de> Deserialize<'de> for Serde<DateTime<FixedOffset>> {
+    fn deserialize<D>(d: D) -> Result<Serde<DateTime<FixedOffset>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct V;
+
+        impl de::Visitor<'_> for V {
+            type Value = DateTime<FixedOffset>;
+
+            fn expecting(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+                fmt.write_str("a timestamp")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<DateTime<FixedOffset>, E>
+            where
+                E: de::Error,
+            {
+                DateTime::parse_from_rfc3339(v).map_err(
+                    |_| E::invalid_value(de::Unexpected::Str(v), &self)
+                )
             }
         }
 
@@ -199,7 +229,19 @@ impl<'de> Deserialize<'de> for Serde<Option<DateTime<Utc>>> {
     }
 }
 
-impl<'a> ser::Serialize for Serde<&'a Duration> {
+impl<'de> Deserialize<'de> for Serde<Option<DateTime<FixedOffset>>> {
+    fn deserialize<D>(d: D) -> Result<Serde<Option<DateTime<FixedOffset>>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match Option::<Serde<DateTime<FixedOffset>>>::deserialize(d)? {
+            Some(Serde(dur)) => Ok(Serde(Some(dur))),
+            None => Ok(Serde(None)),
+        }
+    }
+}
+
+impl ser::Serialize for Serde<&Duration> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -221,13 +263,22 @@ impl ser::Serialize for Serde<Duration> {
     }
 }
 
-impl<'a> ser::Serialize for Serde<&'a DateTime<Utc>> {
+impl ser::Serialize for Serde<&DateTime<Utc>> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
     {
-        humantime::format_rfc3339(*self.0)
-            .to_string()
+        self.0.to_rfc3339_opts(SecondsFormat::Secs, true)
+            .serialize(serializer)
+    }
+}
+
+impl ser::Serialize for Serde<&DateTime<FixedOffset>> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        self.0.to_rfc3339_opts(SecondsFormat::Secs, true)
             .serialize(serializer)
     }
 }
@@ -237,13 +288,22 @@ impl ser::Serialize for Serde<DateTime<Utc>> {
     where
         S: ser::Serializer,
     {
-        humantime::format_rfc3339(self.0)
-            .to_string()
+        self.0.to_rfc3339_opts(SecondsFormat::Secs, true)
             .serialize(serializer)
     }
 }
 
-impl<'a> ser::Serialize for Serde<&'a Option<Duration>> {
+impl ser::Serialize for Serde<DateTime<FixedOffset>> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        self.0.to_rfc3339_opts(SecondsFormat::Secs, true)
+            .serialize(serializer)
+    }
+}
+
+impl ser::Serialize for Serde<&Option<Duration>> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -264,7 +324,19 @@ impl ser::Serialize for Serde<Option<Duration>> {
     }
 }
 
-impl<'a> ser::Serialize for Serde<&'a Option<DateTime<Utc>>> {
+impl ser::Serialize for Serde<&Option<DateTime<Utc>>> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        match *self.0 {
+            Some(tm) => serializer.serialize_some(&Serde(tm)),
+            None => serializer.serialize_none(),
+        }
+    }
+}
+
+impl ser::Serialize for Serde<&Option<DateTime<FixedOffset>>> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -277,6 +349,15 @@ impl<'a> ser::Serialize for Serde<&'a Option<DateTime<Utc>>> {
 }
 
 impl ser::Serialize for Serde<Option<DateTime<Utc>>> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        Serde(&self.0).serialize(serializer)
+    }
+}
+
+impl ser::Serialize for Serde<Option<DateTime<FixedOffset>>> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -337,7 +418,7 @@ mod test {
             time: DateTime<Utc>,
         }
 
-        let json = r#"{"time": "2018-05-11 18:28:30"}"#;
+        let json = r#"{"time": "2018-05-11T18:28:30Z"}"#;
         let foo = serde_json::from_str::<Foo>(json).unwrap();
         assert_eq!(foo.time, DateTime::UNIX_EPOCH + Duration::new(1526063310, 0));
         let reverse = serde_json::to_string(&foo).unwrap();
@@ -352,7 +433,7 @@ mod test {
             time: Option<DateTime<Utc>>,
         }
 
-        let json = r#"{"time": "2018-05-11 18:28:30"}"#;
+        let json = r#"{"time": "2018-05-11T18:28:30Z"}"#;
         let foo = serde_json::from_str::<Foo>(json).unwrap();
         assert_eq!(foo.time, Some(DateTime::UNIX_EPOCH + Duration::new(1526063310, 0)));
         let reverse = serde_json::to_string(&foo).unwrap();

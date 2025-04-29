@@ -10,9 +10,10 @@ readme = "README.md"
 keywords = ["serde", "humantime", "time", "duration"]
 
 [dependencies]
-humantime = {git = "https://github.com/jayakasadev/humantime", rev = "ab7b7aec0feb5c68605118deba68593e180daf7f", default-features = false}
+humantime = {git = "https://github.com/jayakasadev/humantime", rev = "03e5044ae7ee7f2e3322478ca79db79d2b886950", default-features = false}
 serde = { version = "1.0", features = ["derive"] }
-chrono = "0.4"
+chrono = {version = "0.4", default-features = false, features = ["alloc", "rkyv"]}
+
 
 [dev-dependencies]
 serde_json = "1.0"
