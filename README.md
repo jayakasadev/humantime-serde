@@ -14,7 +14,7 @@ Heavily based on this [fork](https://github.com/tailhook/serde-humantime/tree/se
 use serde::{Serialize, Deserialize};
 use std::time::Duration;
 
-use time::OffsetDateTime
+use chrono::DateTime
 
 #[derive(Serialize, Deserialize)]
 struct Foo {
@@ -22,7 +22,7 @@ struct Foo {
     timeout: Duration,
     #[serde(default)]
     #[serde(with = "humantime_serde")]
-    time: Option<OffsetDateTime>,
+    time: Option<DateTime<Tz>>,
 }
 ```
 

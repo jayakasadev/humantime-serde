@@ -10,10 +10,14 @@ readme = "README.md"
 keywords = ["serde", "humantime", "time", "duration"]
 
 [dependencies]
-humantime = {git = "https://github.com/jayakasadev/humantime", rev = "b9786ec7f8ea9c08425e1e2982047cbe9841bdf9", default-features = false}
+humantime = {git = "https://github.com/jayakasadev/humantime", rev = "ab7b7aec0feb5c68605118deba68593e180daf7f", default-features = false}
 serde = { version = "1.0", features = ["derive"] }
-time = {version = "0.3", default-features = false}
+chrono = "0.4"
 
 [dev-dependencies]
 serde_json = "1.0"
 version-sync = "0.9"
+
+[lints.clippy]
+std_instead_of_core = "forbid"
+std_instead_of_alloc = "forbid"

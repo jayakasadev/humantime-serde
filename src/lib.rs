@@ -6,13 +6,13 @@
 //!
 //! Based on [this fork](https://github.com/tailhook/serde-humantime/tree/serde_wrapper).
 //!
-//! Currently `std::time::Duration` and `time::OffsetDateTime` are supported.
+//! Currently `std::time::Duration` and `chrono::DateTime` are supported.
 //!
 //! # Example
 //! ```
 //! use serde::{Serialize, Deserialize};
 //! use std::time::Duration;
-//! use time::OffsetDateTime;
+//! use chrono::{DateTime, Utc};
 //!
 //! #[derive(Serialize, Deserialize)]
 //! struct Foo {
@@ -20,7 +20,7 @@
 //!     timeout: Duration,
 //!     #[serde(default)]
 //!     #[serde(with = "humantime_serde")]
-//!     time: Option<OffsetDateTime>,
+//!     time: Option<DateTime<Utc>>,
 //! }
 //! ```
 //!
@@ -29,11 +29,11 @@
 //! ```
 //! use serde::{Serialize, Deserialize};
 //! use humantime_serde::Serde;
-//! use time::OffsetDateTime;
+//! use chrono::{DateTime, Utc};
 //!
 //! #[derive(Serialize, Deserialize)]
 //! struct Foo {
-//!     timeout: Vec<Serde<OffsetDateTime>>,
+//!     timeout: Vec<Serde<DateTime<Utc>>>,
 //! }
 //! ```
 
@@ -51,11 +51,10 @@ use core::fmt;
 use core::ops::{Deref, DerefMut};
 use core::time::{Duration};
 
-use humantime;
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
-use time::OffsetDateTime;
+use chrono::{DateTime, Utc};
 
-/// Deserializes a `Duration` or `OffsetDateTime` via the humantime crate.
+/// Deserializes a `Duration` or `DateTime<Tz>` via the humantime crate.
 ///
 /// This function can be used with `serde_derive`'s `with` and
 /// `deserialize_with` annotations.
@@ -67,7 +66,7 @@ where
     Serde::deserialize(d).map(Serde::into_inner)
 }
 
-/// Serializes a `Duration` or `OffsetDateTime` via the humantime crate.
+/// Serializes a `Duration` or `DateTime<Tz>` via the humantime crate.
 ///
 /// This function can be used with `serde_derive`'s `with` and
 /// `serialize_with` annotations.
@@ -80,7 +79,7 @@ where
 }
 
 /// A wrapper type which implements `Serialize` and `Deserialize` for
-/// types involving `OffsetDateTime` and `Duration`.
+/// types involving `DateTime<Tz>` and `Duration`.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Serde<T>(T);
 
@@ -148,21 +147,21 @@ impl<'de> Deserialize<'de> for Serde<Duration> {
     }
 }
 
-impl<'de> Deserialize<'de> for Serde<OffsetDateTime> {
-    fn deserialize<D>(d: D) -> Result<Serde<OffsetDateTime>, D::Error>
+impl<'de> Deserialize<'de> for Serde<DateTime<Utc>> {
+    fn deserialize<D>(d: D) -> Result<Serde<DateTime<Utc>>, D::Error>
     where
         D: Deserializer<'de>,
     {
         struct V;
 
         impl<'de2> de::Visitor<'de2> for V {
-            type Value = OffsetDateTime;
+            type Value = DateTime<Utc>;
 
             fn expecting(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
                 fmt.write_str("a timestamp")
             }
 
-            fn visit_str<E>(self, v: &str) -> Result<OffsetDateTime, E>
+            fn visit_str<E>(self, v: &str) -> Result<DateTime<Utc>, E>
             where
                 E: de::Error,
             {
@@ -188,12 +187,12 @@ impl<'de> Deserialize<'de> for Serde<Option<Duration>> {
     }
 }
 
-impl<'de> Deserialize<'de> for Serde<Option<OffsetDateTime>> {
-    fn deserialize<D>(d: D) -> Result<Serde<Option<OffsetDateTime>>, D::Error>
+impl<'de> Deserialize<'de> for Serde<Option<DateTime<Utc>>> {
+    fn deserialize<D>(d: D) -> Result<Serde<Option<DateTime<Utc>>>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        match Option::<Serde<OffsetDateTime>>::deserialize(d)? {
+        match Option::<Serde<DateTime<Utc>>>::deserialize(d)? {
             Some(Serde(dur)) => Ok(Serde(Some(dur))),
             None => Ok(Serde(None)),
         }
@@ -222,7 +221,7 @@ impl ser::Serialize for Serde<Duration> {
     }
 }
 
-impl<'a> ser::Serialize for Serde<&'a OffsetDateTime> {
+impl<'a> ser::Serialize for Serde<&'a DateTime<Utc>> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -233,7 +232,7 @@ impl<'a> ser::Serialize for Serde<&'a OffsetDateTime> {
     }
 }
 
-impl ser::Serialize for Serde<OffsetDateTime> {
+impl ser::Serialize for Serde<DateTime<Utc>> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -265,7 +264,7 @@ impl ser::Serialize for Serde<Option<Duration>> {
     }
 }
 
-impl<'a> ser::Serialize for Serde<&'a Option<OffsetDateTime>> {
+impl<'a> ser::Serialize for Serde<&'a Option<DateTime<Utc>>> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -277,7 +276,7 @@ impl<'a> ser::Serialize for Serde<&'a Option<OffsetDateTime>> {
     }
 }
 
-impl ser::Serialize for Serde<Option<OffsetDateTime>> {
+impl ser::Serialize for Serde<Option<DateTime<Utc>>> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -335,12 +334,12 @@ mod test {
         #[derive(Serialize, Deserialize)]
         struct Foo {
             #[serde(with = "super")]
-            time: OffsetDateTime,
+            time: DateTime<Utc>,
         }
 
         let json = r#"{"time": "2018-05-11 18:28:30"}"#;
         let foo = serde_json::from_str::<Foo>(json).unwrap();
-        assert_eq!(foo.time, OffsetDateTime::UNIX_EPOCH + Duration::new(1526063310, 0));
+        assert_eq!(foo.time, DateTime::UNIX_EPOCH + Duration::new(1526063310, 0));
         let reverse = serde_json::to_string(&foo).unwrap();
         assert_eq!(reverse, r#"{"time":"2018-05-11T18:28:30Z"}"#);
     }
@@ -350,12 +349,12 @@ mod test {
         #[derive(Serialize, Deserialize)]
         struct Foo {
             #[serde(with = "super", default)]
-            time: Option<OffsetDateTime>,
+            time: Option<DateTime<Utc>>,
         }
 
         let json = r#"{"time": "2018-05-11 18:28:30"}"#;
         let foo = serde_json::from_str::<Foo>(json).unwrap();
-        assert_eq!(foo.time, Some(OffsetDateTime::UNIX_EPOCH + Duration::new(1526063310, 0)));
+        assert_eq!(foo.time, Some(DateTime::UNIX_EPOCH + Duration::new(1526063310, 0)));
         let reverse = serde_json::to_string(&foo).unwrap();
         assert_eq!(reverse, r#"{"time":"2018-05-11T18:28:30Z"}"#);
 

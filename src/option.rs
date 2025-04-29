@@ -6,7 +6,7 @@
 //! use serde::{Serialize, Deserialize};
 //! use core::time::Duration;
 //!
-//! use time::OffsetDateTime;
+//! use chrono::{DateTime, Utc};
 //!
 //! #[derive(Serialize, Deserialize)]
 //! struct Foo {
@@ -15,14 +15,14 @@
 //!     timeout: Option<Duration>,
 //!     #[serde(default)]
 //!     #[serde(with = "humantime_serde::option")]
-//!     time: Option<OffsetDateTime>,
+//!     time: Option<DateTime<Utc>>,
 //! }
 //! ```
 
 use super::Serde;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// Serializes an `Option<Duration>` or `Option<time::OffsetDateTime>`
+/// Serializes an `Option<Duration>` or `Option<chrono::DateTime>`
 ///
 /// This function can be used with `serde_derive`'s `with` and
 /// `deserialize_with` annotations.
@@ -35,7 +35,7 @@ where
     nested.serialize(s)
 }
 
-/// Deserialize an `Option<Duration>` or `Option<time::OffsetDateTime>`
+/// Deserialize an `Option<Duration>` or `Option<chrono::DateTime>`
 ///
 /// This function can be used with `serde_derive`'s `with` and
 /// `deserialize_with` annotations.
