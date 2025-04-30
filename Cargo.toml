@@ -12,7 +12,7 @@ keywords = ["serde", "humantime", "time", "duration"]
 [dependencies]
 humantime = {git = "https://github.com/jayakasadev/humantime", rev = "03e5044ae7ee7f2e3322478ca79db79d2b886950", default-features = false}
 serde = { version = "1.0", features = ["derive"] }
-chrono = {version = "0.4", default-features = false, features = ["alloc", "rkyv"]}
+chrono = {version = "0.4", default-features = false, features = ["alloc"]}
 
 
 [dev-dependencies]
